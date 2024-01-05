@@ -105,7 +105,7 @@ static void opcua_task(void *arg)
         while (running)
         {
             UA_Server_run_iterate(server, false);
-             vTaskDelay(100 / portTICK_PERIOD_MS);
+            vTaskDelay(100 / portTICK_PERIOD_MS);
             ESP_ERROR_CHECK(esp_task_wdt_reset());
             taskYIELD();
         }
@@ -123,8 +123,8 @@ static void initialize_sntp(void)
 {
     ESP_LOGI(SNTP_TAG, "Initializing SNTP");
     sntp_setoperatingmode(SNTP_OPMODE_POLL);
-    sntp_setservername(0, "pool.ntp.org");
-    sntp_setservername(1, "time.google.com");
+    sntp_setservername(0, "ntp.aliyun.com");
+    sntp_setservername(1, "pool.ntp.org");
     sntp_set_time_sync_notification_cb(time_sync_notification_cb);
     sntp_init();
     sntp_initialized = true;
@@ -180,13 +180,53 @@ static void disconnect_handler(void *arg, esp_event_base_t event_base,
 {
 }
 
+static void wifi_event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
+{
+    if (event_id == WIFI_EVENT_STA_START)
+    {
+        ESP_LOGI(TAG, "Wi-Fi station started");
+        esp_wifi_connect();
+    }
+    else if (event_id == WIFI_EVENT_STA_DISCONNECTED)
+    {
+        wifi_event_sta_disconnected_t* event_info = (wifi_event_sta_disconnected_t*)event_data;
+        ESP_LOGI(TAG, "Wi-Fi disconnected. Reason: %d", event_info->reason);
+
+        // Retry connection
+        esp_wifi_connect();
+    }
+}
+
 static void connection_scan(void)
 {
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
-    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, GOT_IP_EVENT, &opc_event_handler, NULL));
-    ESP_ERROR_CHECK(esp_event_handler_register(BASE_IP_EVENT, DISCONNECT_EVENT, &disconnect_handler, NULL));
-    ESP_ERROR_CHECK(example_connect());
+    // ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, GOT_IP_EVENT, &opc_event_handler, NULL));
+    // ESP_ERROR_CHECK(esp_event_handler_register(BASE_IP_EVENT, DISCONNECT_EVENT, &disconnect_handler, NULL));
+    // ESP_ERROR_CHECK(example_connect());
+
+    esp_netif_create_default_wifi_sta();
+
+    // Register Wi-Fi event handler for IP events
+    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &opc_event_handler, NULL));
+
+    // Add Wi-Fi connection code here
+    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+
+    wifi_config_t wifi_config = {
+        .sta = {
+            .ssid = "YWX3_2.4",
+            .password = "yuewuxian3",
+            // .ssid = "Honor V10",
+            // .password = "88888888",
+        },
+    };
+    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_STA, &wifi_config));
+    ESP_ERROR_CHECK(esp_wifi_start());
+    ESP_ERROR_CHECK(esp_wifi_connect());
 }
 
 void app_main(void)

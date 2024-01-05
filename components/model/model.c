@@ -1,7 +1,17 @@
 #include "open62541.h"
 #include "model.h"
-#include "DHT22.h"
+#include "dht.h"
 #include "driver/gpio.h"
+
+#if defined(CONFIG_EXAMPLE_TYPE_DHT11)
+#define SENSOR_TYPE DHT_TYPE_DHT11
+#endif
+#if defined(CONFIG_EXAMPLE_TYPE_AM2301)
+#define SENSOR_TYPE DHT_TYPE_AM2301
+#endif
+#if defined(CONFIG_EXAMPLE_TYPE_SI7021)
+#define SENSOR_TYPE DHT_TYPE_SI7021
+#endif
 
 static void
 configureGPIO();
@@ -11,6 +21,20 @@ static void
 configureGPIO(void) {
     gpio_set_direction(RELAY_0_GPIO, GPIO_MODE_INPUT_OUTPUT);
     gpio_set_direction(RELAY_1_GPIO, GPIO_MODE_INPUT_OUTPUT);
+}
+
+//Read temperature and return it to be used on temperature variable node
+float ReadTemperature(void) {
+    float temperature, humidity;
+
+    if (dht_read_float_data(SENSOR_TYPE, CONFIG_EXAMPLE_DATA_GPIO, &humidity, &temperature) == ESP_OK) {
+        printf("Humidity: %.1f%% Temp: %.1fC\n", humidity, temperature);
+        return temperature;
+    }
+    else {
+        printf("Could not read data from sensor\n");
+        return -1;
+    }
 }
 
 // /* LED Method */
@@ -94,11 +118,11 @@ configureGPIO(void) {
 
 UA_StatusCode
 readCurrentTemperature(UA_Server *server,
-                const UA_NodeId *sessionId, void *sessionContext,
-                const UA_NodeId *nodeId, void *nodeContext,
-                UA_Boolean sourceTimeStamp, const UA_NumericRange *range,
-                UA_DataValue *dataValue) {
-    UA_Float temperature = ReadTemperature(DHT22_GPIO);
+                       const UA_NodeId *sessionId, void *sessionContext,
+                       const UA_NodeId *nodeId, void *nodeContext,
+                       UA_Boolean sourceTimeStamp, const UA_NumericRange *range,
+                       UA_DataValue *dataValue) {
+    UA_Float temperature = ReadTemperature();
     UA_Variant_setScalarCopy(&dataValue->value, &temperature,
                              &UA_TYPES[UA_TYPES_FLOAT]);
     dataValue->hasValue = true;
@@ -112,6 +136,7 @@ addCurrentTemperatureDataSourceVariable(UA_Server *server) {
     attr.displayName = UA_LOCALIZEDTEXT("en-US", "Temperature");
     attr.dataType = UA_TYPES[UA_TYPES_FLOAT].typeId;
     attr.accessLevel = UA_ACCESSLEVELMASK_READ;
+    attr.minimumSamplingInterval = 5000; // 采样间隔，单位：毫秒
 
     UA_NodeId currentNodeId = UA_NODEID_STRING(1, "temperature");
     UA_QualifiedName currentName = UA_QUALIFIEDNAME(1, "Ambient Temperature");
@@ -145,11 +170,11 @@ readRelay0State(UA_Server *server,
 
 UA_StatusCode
 setRelay0State(UA_Server *server,
-                  const UA_NodeId *sessionId, void *sessionContext,
-                  const UA_NodeId *nodeId, void *nodeContext,
-                 const UA_NumericRange *range, const UA_DataValue *data) {
+               const UA_NodeId *sessionId, void *sessionContext,
+               const UA_NodeId *nodeId, void *nodeContext,
+               const UA_NumericRange *range, const UA_DataValue *data) {
     UA_Boolean currentState = gpio_get_level(RELAY_0_GPIO);
-    int level = currentState == true ? 0:1;
+    int level = currentState == true ? 0 : 1;
     gpio_set_level(RELAY_0_GPIO, level);
     UA_Boolean relay0_state_after_write = gpio_get_level(RELAY_0_GPIO);
     UA_StatusCode status = relay0_state_after_write == level ? UA_STATUSCODE_GOOD : UA_STATUSCODE_BADINTERNALERROR;
@@ -197,11 +222,11 @@ readRelay1State(UA_Server *server,
 
 UA_StatusCode
 setRelay1State(UA_Server *server,
-                  const UA_NodeId *sessionId, void *sessionContext,
-                  const UA_NodeId *nodeId, void *nodeContext,
-                 const UA_NumericRange *range, const UA_DataValue *data) {
+               const UA_NodeId *sessionId, void *sessionContext,
+               const UA_NodeId *nodeId, void *nodeContext,
+               const UA_NumericRange *range, const UA_DataValue *data) {
     UA_Boolean currentState = gpio_get_level(RELAY_1_GPIO);
-    int level = currentState == true ? 0:1;
+    int level = currentState == true ? 0 : 1;
     gpio_set_level(RELAY_1_GPIO, level);
     UA_Boolean relay1_state_after_write = gpio_get_level(RELAY_1_GPIO);
     UA_StatusCode status = relay1_state_after_write == level ? UA_STATUSCODE_GOOD : UA_STATUSCODE_BADINTERNALERROR;

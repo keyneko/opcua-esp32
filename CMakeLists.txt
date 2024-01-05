@@ -2,7 +2,6 @@
 # CMakeLists in this exact order for cmake to work correctly
 cmake_minimum_required(VERSION 3.5)
 
-
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
-set(EXTRA_COMPONENTS_DIRS "components/open62541lib" "components/ethernet" "components/model")
+set(EXTRA_COMPONENTS_DIRS "components/open62541lib" "components/ethernet" "components/model" "components/dht" "components/esp_idf_lib_helpers")
 project(opcua_esp32)

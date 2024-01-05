@@ -12,8 +12,9 @@
 #include "nvs_flash.h"
 #include "lwip/ip_addr.h"
 #include "sdkconfig.h"
+#include "esp_wifi.h"
 
-#include "ethernet_connect.h"
+// #include "ethernet_connect.h"
 #include "open62541.h"
-#include "DHT22.h"
+#include "dht.h"
 #include "model.h"
